@@ -15,7 +15,7 @@ export interface Category {
 export interface Resource {
     id: string;
     title: string;
-    desscription: string;
+    description: string;
     file_url: string;
     file_type?: string | null;
     category_id: number;
