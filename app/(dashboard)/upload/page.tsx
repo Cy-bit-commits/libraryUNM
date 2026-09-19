@@ -101,7 +101,7 @@ export default function UploadPage() {
                         <Loader2 className="w-16 h-16 text-blue-600 animate-spin" />
                         <UploadCloud className="w-7 h-7 text-blue-600 absolute" />
                         </div>
-                        <h3   h-3 className="text-lg font-semibold text-gray-900">
+                        <h3   h3 className="text-lg font-semibold text-gray-900">
                             Uploading Resource
                         </h3>
                         <p className="text-sm text-gray-500 mt-2 font-medium animate-pulse">
