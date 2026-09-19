@@ -23,6 +23,7 @@ export default function DashboardPage() {
         loadAllResources();
     }, []);
 
+    
     const handleSearch = async (query: string) => {
         if (!query.trim()) {
         loadAllResources();

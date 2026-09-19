@@ -6,13 +6,13 @@ import { Resource } from '@/types';
 export async function getResources() {
     const { data, error } = await supabase
         .from('resources')
-        .select('*, categories(*)').order('created_at', {ascending: false});
+        .select('*, categories(id, name, code ), profiles(id, full_name, email)').order('created_at', {ascending: false});
 
-        if (error){
-            console.error('Error fetching resources:', error.message);
-            return {data: null, error};
-        }
-        return {data: data as Resource[], error: null};
+    if (error){
+        console.error('Error fetching resources:', error.message);
+        return {data: null, error};
+    }
+    return {data: data as Resource[], error: null};
 }
 // search resources by matcing keywoeds in the title(case insensitive)
 
@@ -40,19 +40,27 @@ export async function uploadResource({
     description,
     categoryId,
     userId,
+    onStatusUpdate,
 }:{
     file: File;
     title: string;
     description: string;
     categoryId: number;
     userId: string;
+    onStatusUpdate?: (status: string) => void;
 }){
+    const rawExt = file.name.split('.').pop() || 'file';
+    const fileExt = rawExt.replace(/[^a-zA-Z0-9]/g, '').toLowerCase(); // sanitize the file extension
+
+
 
     //generate a unique file name using the current timestamp and a random string
     //to avoid same name collisions in the supabase storage bucket
-    const fileExt = file.name.split('.').pop();
-    const fileName = '${Date.now()}-${Math.random().toString(36),substring(2,7)}.${fileExt}';
-    const filePath = 'documents/${fileName}';
+    
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2,7)}.${fileExt}`;
+    const filePath = `documents/${fileName}`;
+// status update to indicate that the file upload process has started
+    onStatusUpdate?.('Uploading file to storage...');
 
 
     //uploads physical file to subapase storage bucket
@@ -65,6 +73,9 @@ export async function uploadResource({
         return { data: null, error: uploadError};
         
     }
+    //status update to indicate that the file has been uploaded and
+    //  the next step is to save metadata to the database
+    onStatusUpdate?.('File uploaded. Saving metadata to database...');
     //get the public download url for file
     const {data: urlData} = supabase.storage
         .from('academic-files')

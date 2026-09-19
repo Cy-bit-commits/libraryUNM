@@ -63,6 +63,12 @@ export async function signOutUser(){
 }
 
 export async function getCurrentUser(){
+    //check the local browser session storage
+    const {data: {session} }= await supabase.auth.getSession();
+    if (session?.user) return session.user;
+
+    
+    //fall back to server authentication check
     const {data: {user}, error} = await supabase.auth.getUser();
     if (error){
         console.error('Get Current User Error:', error.message);

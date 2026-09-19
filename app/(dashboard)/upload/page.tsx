@@ -6,6 +6,7 @@ import { uploadResource } from "@/services/resourceService";
 import { getCurrentUser } from "@/services/authService";
 import { supabase } from "@/lib/supabaseClient";
 import { Category } from "@/types";
+import { Loader2, CheckCircle2, UploadCloud } from "lucide-react";
 
 export default function UploadPage() {
     const router = useRouter();
@@ -16,19 +17,24 @@ export default function UploadPage() {
     const [categories, setCategories] = useState<Category[]>([]);
     const [userId, setUserId] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [statusMessage, setStatusMessage] = useState<string>("");
+    const [isSuccess, setIsSuccess] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     useEffect(() => {
         async function prepareUploadPage() {
-        const user = await getCurrentUser();
+            const user = await getCurrentUser();
+
+
         if (!user) {
             router.push("/login");
             return;
         }
+
         setUserId(user.id);
 
-        const { data } = await supabase.from("categories").select("*");
-        if (data) setCategories(data);
+        const { data, error } = await supabase.from("categories").select("*");
+        if (!error && data) setCategories(data);
         }
 
         prepareUploadPage();
@@ -36,103 +42,157 @@ export default function UploadPage() {
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
-        if (!file || !userId || categoryId === "") {
-        setErrorMsg(
-            "Please select a file, category, and ensure you are logged in.",
-        );
-        return;
+
+        let activeUserId = userId;
+
+
+        if (!activeUserId) {
+            const user = await getCurrentUser();
+            activeUserId = user?.id || null;
+        }
+
+        if (!file || !activeUserId || categoryId === "") {
+            setErrorMsg(
+                "Please select a valid file, category, and ensure you are logged in.",
+            );
+            return;
         }
 
         setLoading(true);
+        setIsSuccess(false);
         setErrorMsg(null);
 
         const { error } = await uploadResource({
-        file,
-        title,
-        description,
-        categoryId: Number(categoryId),
-        userId,
+            file,
+            title,
+            description,
+            categoryId: Number(categoryId),
+            userId: activeUserId,
+            onStatusUpdate: (msg) => setStatusMessage(msg),
         });
 
         if (error) {
-        setErrorMsg(error.message);
-        setLoading(false);
+            setErrorMsg(error.message);
+            setLoading(false);
         } else {
-        router.push("/");
+            setIsSuccess(true);
+            setTimeout(() => {
+                router.refresh();
+                router.push("/");
+            }, 1200);
         }
     };
 
     return (
-        <div className="max-w-xl mx-auto p-6 bg-white border rounded-lg shadow-sm mt-8">
-        <h1 className="text-2xl font-bold mb-4">Upload Academic Resource</h1>
+        <div className="relative max-w-xl mx-auto p-6 bg-white border rounded-lg shadow-sm mt-8">
+            {/* Real-Time Loading Screen Modal Overlay */}
+            {loading && (
+                <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-xl shadow-xl p-8 max-w-sm w-full text-center flex flex-col items-center animate-in fade-in zoom-in-95 duration-200">
+                    {isSuccess ? (
+                    <>
+                        <CheckCircle2 className="w-16 h-16 text-green-500 mb-4 animate-bounce" />
+                        <h3 className="text-xl font-bold text-gray-900">All Done!</h3>
+                        <p className="text-sm text-gray-500 mt-2">{statusMessage}</p>
+                    </>
+                    ) : (
+                    <>
+                        <div className="relative mb-4 flex items-center justify-center">
+                        <Loader2 className="w-16 h-16 text-blue-600 animate-spin" />
+                        <UploadCloud className="w-7 h-7 text-blue-600 absolute" />
+                        </div>
+                        <h3   h-3 className="text-lg font-semibold text-gray-900">
+                            Uploading Resource
+                        </h3>
+                        <p className="text-sm text-gray-500 mt-2 font-medium animate-pulse">
+                        {statusMessage || "Preparing file..."}
+                        </p>
+                    </>
+                    )}
+                </div>
+                </div>
+            )}
 
-        {errorMsg && (
-            <div className="p-3 mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded">
-            {errorMsg}
+            <h1 className="text-2xl font-bold mb-4 text-gray-900">
+            Upload Academic Resource
+            </h1>
+
+            {errorMsg && (
+                <div className="p-3 mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded">
+                {errorMsg}
             </div>
-        )}
+            )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-            <label className="block text-sm font-medium">Document Title</label>
-            <input
-                type="text"
-                required
-                placeholder="e.g., CS101 Midterm Reviewer"
-                className="w-full p-2 border rounded mt-1"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-            />
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                <label className="block text-sm font-medium text-gray-700">
+                    Document Title
+                </label>
+                <input
+                    type="text"
+                    required
+                    placeholder="e.g., CS101 Final Reviewer"
+                    className="w-full p-2 border rounded mt-1 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                />
+                </div>
+
+                <div>
+                <label className="block text-sm font-medium text-gray-700">
+                    Category
+                </label>
+                <select
+                    required
+                    className="w-full p-2 border rounded mt-1 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    value={categoryId}
+                    onChange={(e) => {
+                    const val = e.target.value;
+                    setCategoryId(val === "" ? "" : Number(val));
+                    }}
+                >
+                    <option value="">Select a Category</option>
+                    {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                    </option>
+                    ))}
+                </select>
+                </div>
+
+                <div>
+                <label className="block text-sm font-medium text-gray-700">
+                    Description
+                </label>
+                <textarea
+                    rows={3}
+                    placeholder="Brief details about this resource..."
+                    className="w-full p-2 border rounded mt-1 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                />
+                </div>
+
+                <div>
+                <label className="block text-sm font-medium text-gray-700">
+                    File (PDF, Doc, Image)
+                </label>
+                <input
+                    type="file"
+                    required
+                    className="w-full p-2 border rounded mt-1 file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                    onChange={(e) => setFile(e.target.files?.[0] || null)}
+                />
+                </div>
+
+                <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-blue-600 text-white py-2.5 rounded font-semibold hover:bg-blue-700 transition disabled:opacity-50"
+                >
+                Publish Resource
+                </button>
+            </form>
             </div>
-
-            <div>
-            <label className="block text-sm font-medium">Category</label>
-            <select
-                required
-                className="w-full p-2 border rounded mt-1 bg-white"
-                value={categoryId}
-                onChange={(e) => setCategoryId(Number(e.target.value))}
-            >
-                <option value="">Select a Category</option>
-                {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                </option>
-                ))}
-            </select>
-            </div>
-
-            <div>
-            <label className="block text-sm font-medium">Description</label>
-            <textarea
-                rows={3}
-                placeholder="Brief details about this resource..."
-                className="w-full p-2 border rounded mt-1"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-            />
-            </div>
-
-            <div>
-            <label className="block text-sm font-medium">
-                File (PDF, Doc, Image)
-            </label>
-            <input
-                type="file"
-                required
-                className="w-full p-2 border rounded mt-1"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-            />
-            </div>
-
-            <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 rounded font-semibold hover:bg-blue-700 disabled:opacity-50"
-            >
-            {loading ? "Uploading..." : "Publish Resource"}
-            </button>
-        </form>
-        </div>
-    );
+        );
 }
